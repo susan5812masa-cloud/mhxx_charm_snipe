@@ -1,7 +1,8 @@
 # find_frame.py
 # mhxx-rngを使って護石のフレーム数を検索するモジュール
 
-MHXX_RNG_PATH = r'F:\Workspace\Python\mhxx-capture\mhxx-rng-main\mhxx-rng.py'
+import os as _os
+MHXX_RNG_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'mhxx-rng-main', 'mhxx-rng.py')
 
 # ===== mhxx-rng の初期グローバル変数 =====
 s = [0x0194FD72, 0x79E6C985, 0x08DD9701, 0x41CFCE91]

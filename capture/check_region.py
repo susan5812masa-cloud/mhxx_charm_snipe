@@ -1,8 +1,9 @@
 import cv2
 import os
 
-input_dir = r"F:\Workspace\Python\mhxx-capture\screenshots"
-output_dir = r"F:\Workspace\Python\mhxx-capture\test"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+input_dir = os.path.join(_BASE_DIR, 'screenshots')
+output_dir = os.path.join(_BASE_DIR, 'test')
 os.makedirs(output_dir, exist_ok=True)
 
 files = sorted([f for f in os.listdir(input_dir) if f.endswith(".png")])

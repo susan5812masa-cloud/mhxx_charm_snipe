@@ -7,7 +7,7 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
 # スクショ保存フォルダ
-save_dir = r"F:\Workspace\Python\mhxx-capture\screenshots"
+save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'screenshots')
 os.makedirs(save_dir, exist_ok=True)
 count = 0
 

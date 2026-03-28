@@ -10,9 +10,10 @@ from difflib import get_close_matches
 # ===== 設定 =====
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-TEMPLATE_CIRCLE = r'F:\Workspace\Python\mhxx-capture\test\template_circle.png'
-TEMPLATE_DASH   = r'F:\Workspace\Python\mhxx-capture\test\template_dash.png'
-OUTPUT_CSV      = r'F:\Workspace\Python\mhxx-capture\talisman_log.csv'
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_CIRCLE = os.path.join(_BASE_DIR, 'test', 'template_circle.png')
+TEMPLATE_DASH   = os.path.join(_BASE_DIR, 'test', 'template_dash.png')
+OUTPUT_CSV      = os.path.join(_BASE_DIR, 'talisman_log.csv')
 
 KNOWN_SKILLS = [
     # スキル1候補
@@ -170,7 +171,7 @@ def save_to_csv(result):
 if __name__ == "__main__":
     from find_frame import find_frame
 
-    IMAGE_PATH = r'F:\Workspace\Python\mhxx-capture\test\sample.png'
+    IMAGE_PATH = os.path.join(_BASE_DIR, 'test', 'sample.png')
 
 # ===== 欲しい護石の設定 =====
     # ▼ WANT_SKILL1は以下から選んでコピペ（スキル1に設定できるもの）
