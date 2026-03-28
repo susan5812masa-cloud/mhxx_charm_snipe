@@ -20,3 +20,9 @@ Desktop.ini
 
 # ログファイル
 *.csv
+
+# スクリーンショット（実行時に生成されるもの）
+capture/screenshots/
+
+# テスト用画像（デバッグ時に生成されるもの）
+capture/test/
