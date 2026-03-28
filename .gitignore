@@ -11,6 +11,9 @@ build/
 *.elf
 *.hex
 
+# Arduino（デバッグ用スケッチ - ローカルのみ）
+arduino/mhxx-rng-long-debug/
+
 # VS Code
 .vscode/
 
