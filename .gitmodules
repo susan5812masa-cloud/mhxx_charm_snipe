@@ -1,0 +1,3 @@
+[submodule "capture/mhxx-rng-main"]
+	path = capture/mhxx-rng-main
+	url = https://github.com/apmnnn/mhxx-rng

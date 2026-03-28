@@ -27,5 +27,3 @@ capture/screenshots/
 # テスト用画像（デバッグ時に生成されるもの）
 capture/test/
 
-# 外部リポジトリ（submoduleで管理）
-capture/mhxx-rng-main/
