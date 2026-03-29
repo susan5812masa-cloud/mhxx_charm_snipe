@@ -21,9 +21,9 @@ for filename in files:
     print(f"読み込み成功：{filename}　サイズ：{img.shape}")
     base = os.path.splitext(filename)[0]
 
-    panel         = img[130:500, 700:1300]
-    skill1_region = img[245:290, 950:1300]
-    skill2_region = img[285:330, 950:1300]
+    panel         = img[130:500, 700:1265]
+    skill1_region = img[247:285, 970:1265]
+    skill2_region = img[288:327, 970:1265]
     slot_region   = img[330:375, 700:1000]
 
     cv2.imwrite(os.path.join(output_dir, f"{base}_panel.png"),  panel)

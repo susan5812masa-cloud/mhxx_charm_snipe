@@ -2,7 +2,8 @@
 # mhxx-rngを使って護石のフレーム数を検索するモジュール
 
 import os as _os
-MHXX_RNG_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'mhxx-rng-main', 'mhxx-rng.py')
+import json as _json
+MHXX_RNG_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'mhxx-rng-main', 'mhxx-rng.ipynb')
 
 # ===== mhxx-rng の初期グローバル変数 =====
 s = [0x0194FD72, 0x79E6C985, 0x08DD9701, 0x41CFCE91]
@@ -12,9 +13,21 @@ num_of_charms = 40
 showallrank = True
 showrare = True
 
-# ===== mhxx-rng の定義部分のみ読み込む =====
+# ===== mhxx-rng の定義部分のみ読み込む（.ipynbから直接取得）=====
 with open(MHXX_RNG_PATH, 'r', encoding='utf-8') as _f:
-    _lines = _f.readlines()
+    _nb = _json.load(_f)
+
+# コードセルのソースを結合して行リストを作成
+_lines = []
+for _cell in _nb['cells']:
+    if _cell['cell_type'] == 'code':
+        _src = _cell['source']
+        if isinstance(_src, str):
+            _src = _src.splitlines(keepends=True)
+        if _src and not _src[-1].endswith('\n'):
+            _src = list(_src)
+            _src[-1] += '\n'
+        _lines.extend(_src)
 
 # セクション境界を検出
 _first_start  = next(i for i, l in enumerate(_lines) if '# @title 1st' in l)
@@ -77,13 +90,19 @@ SKILL_NAME_MAP = {
     '超会心': '特会',  # OCR誤認識対策
 }
 
-def find_frame(skill1_name, skill1_val, skill2_name, skill2_val, slots, max_frame=10**7):
+def find_frame(skill1_name, skill1_val, skill2_name, skill2_val, slots,
+               start_frame=0, max_frame=10**7):
     rng_skill1 = SKILL_NAME_MAP.get(skill1_name)
     if rng_skill1 is None:
         print(f"[ERROR] スキル1 '{skill1_name}' がSKILL_NAME_MAPにありません")
         return []
 
-    val1 = int(str(skill1_val).replace('+', ''))
+    # val1 の検証（'?' や None はエラー扱い）
+    _val1_str = str(skill1_val).replace('+', '').strip()
+    if not _val1_str.lstrip('-').isdigit():
+        print(f"[ERROR] スキル1の値が無効です: '{skill1_val}' （OCR失敗の可能性）")
+        return []
+    val1 = int(_val1_str)
     val2 = int(str(skill2_val).replace('+', '')) if skill2_val not in (None, '?') else 0
 
     # スキル2が不明かどうか判定
@@ -94,19 +113,25 @@ def find_frame(skill1_name, skill1_val, skill2_name, skill2_val, slots, max_fram
         print(f"\n[検索開始] {rng_skill1}{val1:+d} / スキル2なし スロット{slots}")
     else:
         print(f"\n[検索開始] {rng_skill1}{val1:+d} / {rng_skill2}{val2:+d} スロット{slots}")
-    print(f"  検索範囲: 0〜{max_frame:,}F")
+    print(f"  検索範囲: {start_frame:,}〜{max_frame:,}F")
 
     set_blue()
     init()
-    jump(0)
+    jump(start_frame)
 
     found = []
+    search_count = max_frame - start_frame
 
     if no_skill2:
         # スキル2なし → search_greater_skill1 相当
-        p = parameter(rng_skill1, val1, '達人', 1, slots, 'マカ')  # skill2はダミー
+        try:
+            p = parameter(rng_skill1, val1, '達人', 1, slots, 'マカ')  # skill2はダミー
+        except (ValueError, IndexError) as e:
+            print(f"[ERROR] parameter() 失敗（スキル1が護石skill1として無効な可能性）: {e}")
+            print(f"  スキル1='{skill1_name}'({rng_skill1}) val={val1} スロット={slots}")
+            return []
         _id1, _sp1, _id2, _sp2, _slot, _origin, _len1, _len2 = p
-        for i in range(max_frame):
+        for i in range(search_count):
             roll()
             if r0 % _len1 == _id1:
                 c = getcharm(_origin)
@@ -116,9 +141,14 @@ def find_frame(skill1_name, skill1_val, skill2_name, skill2_val, slots, max_fram
                     found.append(frame)
     else:
         # スキル2あり → 通常のsearch
-        p = parameter(rng_skill1, val1, rng_skill2, val2, slots, 'マカ')
+        try:
+            p = parameter(rng_skill1, val1, rng_skill2, val2, slots, 'マカ')
+        except (ValueError, IndexError) as e:
+            print(f"[ERROR] parameter() 失敗（スキルの組み合わせが無効な可能性）: {e}")
+            print(f"  スキル1='{skill1_name}'({rng_skill1}{val1:+d}) スキル2='{skill2_name}'({rng_skill2}{val2:+d}) スロット={slots}")
+            return []
         _id1, _sp1, _id2, _sp2, _slot, _origin, _len1, _len2 = p
-        for i in range(max_frame):
+        for i in range(search_count):
             roll()
             if r0 % _len1 == _id1 and r2 % 100 >= th and r3 % _len2 == _id2:
                 c = getcharm(_origin)
@@ -138,4 +168,4 @@ def find_frame(skill1_name, skill1_val, skill2_name, skill2_val, slots, max_fram
 if __name__ == '__main__':
     # テスト: sample.pngの護石（本気+6 / 裏会心+2 / スロット0）
     results = find_frame('本気', '+6', '裏会心', '+2', 0, max_frame=10**7)
-    print(f"\n結果: {results}")
+    print(results[:5])

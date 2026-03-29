@@ -41,17 +41,59 @@ KNOWN_SKILLS = [
 
 # KNOWN_SKILLSの直後に追加
 OCR_CORRECTION = {
+    # 裏会心系
     "理会": "裏会心",
     "裏会": "裏会心",
     "裏会c": "裏会心",
+    # 会心系
     "特殊会": "特殊会心",
     "超会": "超会心",
+    # その他
     "弱点特": "弱点特効",
     "走行継": "走行継続",
     "装填速": "装填速度",
     "刃鱗": "刃鱗",
-    "灸": "刃鱗",    # ← 追加
-    "刃麟": "刃鱗",  # ← 追加
+    "灸": "刃鱗",
+    "刃麟": "刃鱗",
+    "鱗": "刃鱗",       # 1文字誤読
+    # 会心強化の誤読（青会必, 東会刷 など）
+    "会必": "会心強化",
+    "会刷": "会心強化",
+    "青会": "会心強化",
+    "東会": "会心強化",
+    # 痛撃の誤読（痛→導 など）
+    "導撃": "痛撃",
+    # 剣術の誤読（剣→秘/艦/舗 など複数パターン）
+    "秘術": "剣術",
+    "劍術": "剣術",
+    "劔術": "剣術",
+    "艦術": "剣術",
+    "舗術": "剣術",
+    "剣術": "剣術",
+    # 龍属性攻撃の誤読（先頭の龍が欠落・竜に誤読）
+    "龍属性攻": "龍属性攻撃",
+    "竜属性攻": "龍属性攻撃",
+    "龍属性攻撃": "龍属性攻撃",
+    # 裏会心の追加誤読パターン（裏→浪 など）
+    "裏心": "裏会心",
+    "浪会心": "裏会心",
+    # 特殊会心の追加誤読パターン
+    "特殊心": "特殊会心",
+    "殊会心": "特殊会心",
+    "特殊会心": "特殊会心",
+    # 貫通弾強化の誤読（貫→員, 強→綴 など）
+    "員通弾": "貫通弾強化",
+    "貫通弾": "貫通弾強化",
+    "貫通弾強": "貫通弾強化",
+    # 通常弾強化の誤読
+    "通常弾強": "通常弾強化",
+    "通強": "通常弾強化",
+    # 散弾強化の誤読
+    "散弾強": "散弾強化",
+    # 重撃弾強化の誤読
+    "重撃弾強": "重撃弾強化",
+    # 貫通弾強化の別誤読パターン
+    "貫強": "貫通弾強化",
 }
 
 # ===== OCR関連 =====
@@ -64,8 +106,19 @@ def fuzzy_match(name):
     return matches[0] if matches else None
 
 def extract_value(text):
+    # 数字の誤読を補正（/→7, ]→7, l/I→1, O/o→0）
+    text = re.sub(r'(?<=[+\-\s])([/\]])', lambda m: '7', text)
+    text = text.replace('O', '0').replace('o', '0')
+    text = text.replace('l', '1').replace('I', '1')
+    # まず +/- 付きの数値を優先
     m = re.search(r'[+\-]\s*\d+', text)
-    return m.group().replace(' ', '') if m else None
+    if m:
+        return m.group().replace(' ', '')
+    # 符号なし数値もサポート（OCRが+を認識できなかった場合 → 護石スキルは正の値のみ）
+    m = re.search(r'(?<![A-Za-z\d])\d+(?![A-Za-z\d])', text)
+    if m:
+        return '+' + m.group()
+    return None
 
 def extract_name(text):
     name = re.sub(r'[+\-]\s*\d+', '', text)
@@ -76,23 +129,77 @@ def extract_name(text):
             return val
     return fuzzy_match(name) if len(name) >= 2 else None
 
+def _preprocess(img_bgr, pad=20):
+    """BGRまたはグレー画像を受け取り、OCRに適した白背景・黒文字の2値画像を返す。
+    pad: 端の文字をTesseractが取りこぼさないよう白余白を全周追加"""
+    if len(img_bgr.shape) == 3:
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img_bgr
+    inverted = cv2.bitwise_not(gray)   # 暗背景・白文字 → 白背景・黒文字
+    _, thresh = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    thresh = cv2.copyMakeBorder(thresh, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=255)
+    return thresh
+
 def read_skill(img):
-    img2 = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-    inverted = cv2.bitwise_not(gray)
+    h, w = img.shape[:2]
 
-    text1 = pytesseract.image_to_string(img, lang='jpn').strip()
-    name1 = extract_name(text1)
-    val1  = extract_value(text1)
+    # ── 名前領域（左60%）と値領域（右40%）に分割 ──
+    split_x  = int(w * 0.60)
+    name_img = img[:, :split_x]
+    val_img  = img[:, split_x:]
 
-    text2 = pytesseract.image_to_string(inverted, lang='jpn', config='--psm 7').strip()
-    name2 = extract_name(text2)
-    val2  = extract_value(text2)
+    # 2倍拡大後に前処理
+    scale = 3
+    name_big = cv2.resize(name_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    val_big  = cv2.resize(val_img,  None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    # 全領域（名前+値）をフォールバック用に用意
+    full_big  = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
-    print(f"    [DEBUG] text1='{text1}' → name='{name1}' val='{val1}'")  # ← 追加
-    print(f"    [DEBUG] text2='{text2}' → name='{name2}' val='{val2}'")  # ← 追加
+    name_proc = _preprocess(name_big)
+    val_proc  = _preprocess(val_big)
+    full_proc = _preprocess(full_big)
 
-    return name1 or name2, val1 or val2
+    # ── 名前 OCR ──
+    best_name = None
+    name_candidates = [
+        (name_proc, '--psm 7'),
+        (name_big,  '--psm 7'),
+        (name_big,  '--psm 8'),   # 単語モード
+        (name_proc, '--psm 8'),
+        (name_big,  '--psm 6'),   # ブロックモード
+        (full_proc, '--psm 7'),   # 全領域フォールバック
+        (full_big,  '--psm 7'),
+        (name_big,  ''),
+    ]
+    for ocr_img, cfg in name_candidates:
+        text = pytesseract.image_to_string(ocr_img, lang='jpn', config=cfg).strip()
+        name = extract_name(text)
+        print(f"    [DEBUG name] '{text}' → {name}")
+        if name:
+            best_name = name
+            break
+
+    # ── 値 OCR（whitelist で +と数字のみ認識）──
+    best_val = None
+    VAL_WL = '--psm 7 -c tessedit_char_whitelist=+0123456789'
+    val_candidates = [
+        (val_proc, VAL_WL,     'eng'),
+        (val_big,  VAL_WL,     'eng'),
+        (val_proc, '--psm 7',  'eng'),
+        (val_big,  '--psm 7',  'eng'),
+        (val_proc, '--psm 7',  'jpn'),
+        (val_big,  '--psm 7',  'jpn'),
+    ]
+    for ocr_img, cfg, lang in val_candidates:
+        text = pytesseract.image_to_string(ocr_img, lang=lang, config=cfg).strip()
+        val  = extract_value(text)
+        print(f"    [DEBUG val ] lang={lang} '{text}' → {val}")
+        if val:
+            best_val = val
+            break
+
+    return best_name, best_val
 
 # ===== スロット読み取り =====
 def count_slots(slot_img, circle_tmpl, dash_tmpl, threshold=0.7):
@@ -120,8 +227,8 @@ def read_talisman(image_path):
     print(f"  画像サイズ: {img.shape[1]}x{img.shape[0]}")
 
     # 各領域の切り出し
-    skill1_region = img[245:290, 950:1300]
-    skill2_region = img[285:330, 950:1300]
+    skill1_region = img[247:285, 970:1265]
+    skill2_region = img[288:327, 970:1265]
     slot_region   = img[330:375, 700:1000]
 
     # スキル読み取り

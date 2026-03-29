@@ -4,7 +4,7 @@
 // ★☆★ターゲットフレームが大きい時用のコード★☆★
 //   ★ ターゲットフレーム（護石を変えるときに変更する）
 // =========================================
-const unsigned long TARGET_FRAME = 4351902;  //
+const unsigned long TARGET_FRAME = 702223;  //
 
 // =========================================
 //   ★ キャリブレーション（実測のたびに更新する）
@@ -16,7 +16,7 @@ const unsigned long TARGET_FRAME = 4351902;  //
 //   ※ Nc は変わらず WAIT_AFTER だけで誤差を吸収する
 //   ※ 対応範囲: -2000F < ADJUST_F < +15000F
 // =========================================
-const float ADJUST_F = 7945.0f;
+const float ADJUST_F = -521.0f;
 
 // =========================================
 //   ★ 環境定数（再測定したときだけ更新する）
@@ -27,7 +27,7 @@ const float ADJUST_F = 7945.0f;
 //   BASE_CONST   : 固定消費F（起動・ロード・操作等の固定分）★変更しない
 //   WAIT_BEFORE  : continue連打前の事前待機(ms)　固定値
 // =========================================
-const float         FC          = 724.35f;
+const float         FC          = 725.71f;
 const float         F_BEFORE_MS =   0.02797f;
 const float         F_AFTER_MS  =   0.032535f;
 const float         BASE_CONST  = 1750.475f;  // ★この値は変更しない
@@ -121,7 +121,7 @@ void runMacro() {
 
 // =========================================
   //↓2行を入れる場合は↑を32に、↓を消す場合は↑を34に
-  delay(500);
+  delay(750);
   pushButton(Button::A, 250);
 // =========================================
 
@@ -135,7 +135,9 @@ void runMacro() {
     pushButton(Button::B, 100);
     delay(100);
   }
-
+    pushButton(Button::A, 100);
+    delay(100);
+    
   // ④ 事後待機
   waitKeepAlive(WAIT_AFTER);
 
