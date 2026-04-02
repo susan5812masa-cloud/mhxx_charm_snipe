@@ -4,7 +4,7 @@
 // ★☆★ターゲットフレームが大きい時用のコード★☆★
 //   ★ ターゲットフレーム（護石を変えるときに変更する）
 // =========================================
-const unsigned long TARGET_FRAME = 135248;  //
+const unsigned long TARGET_FRAME = 4351902;  //
 
 // =========================================
 //   ★ キャリブレーション（実測のたびに更新する）
@@ -16,7 +16,7 @@ const unsigned long TARGET_FRAME = 135248;  //
 //   ※ Nc は変わらず WAIT_AFTER だけで誤差を吸収する
 //   ※ 対応範囲: -2000F < ADJUST_F < +15000F
 // =========================================
-const float ADJUST_F = -465.0f;
+const float ADJUST_F = 868.0f;
 
 // =========================================
 //   ★ 環境定数（再測定したときだけ更新する）
@@ -31,7 +31,7 @@ const float         FC          = 725.71f;
 const float         F_BEFORE_MS =   0.02797f;
 const float         F_AFTER_MS  =   0.032535f;
 const float         BASE_CONST  = 1750.475f;  // ★この値は変更しない
-const unsigned long WAIT_BEFORE = 20000UL;    // 事前待機(ms)
+const unsigned long WAIT_BEFORE = 5000UL;    // 事前待機(ms)
 
 // =========================================
 //   調整範囲の制限
@@ -39,12 +39,12 @@ const unsigned long WAIT_BEFORE = 20000UL;    // 事前待機(ms)
 // =========================================
 const unsigned long T2_MIN    =    1000UL;   // WAIT_AFTER の下限(ms)
 const unsigned long T2_MAX    =  600000UL;   // WAIT_AFTER の上限(ms) ≈ 10分
-const int           NC_MARGIN =       20;    // 引き込み防止マージン（Nc最大値から引く）
+const int           NC_MARGIN =       3;    // 引き込み防止マージン（Nc最大値から引く）
 
 // =========================================
 //   タイムアウト設定
 // =========================================
-const unsigned long TIMEOUT_MS = 10000UL;    // 完了後に自動停止するまでの時間(ms)
+const unsigned long TIMEOUT_MS = 300000UL;    // 完了後に自動停止するまでの時間(ms)
 
 // =========================================
 //   自動計算結果（変更不要）
@@ -55,9 +55,10 @@ unsigned long WAIT_AFTER   = 0;
 // =========================================
 //   ピン定義
 // =========================================
-const int PIN_BUTTON = 2;
-const int PIN_LED1   = 3;  // 緑（実行中）
-const int PIN_LED2   = 4;  // 赤（完了）
+const int PIN_BUTTON  = 2;
+const int PIN_LED1    = 3;  // 緑（実行中）
+const int PIN_LED2    = 4;  // 赤（完了）
+const int PIN_RESTART = 5;  // 再実行スイッチ（ゲーム終了→マクロ再実行）
 
 // =========================================
 //   状態管理
@@ -112,11 +113,27 @@ void waitKeepAlive(unsigned long total_ms) {
 }
 
 // =========================================
+//   ゲーム終了シーケンス
+//   Home → X → 十字右 → A（各ステップ間200ms）
+// =========================================
+void quitGame() {
+  pushButton(Button::HOME, 100);
+  delay(200);
+  pushButton(Button::X, 100);
+  delay(200);
+  pushHat(Hat::RIGHT);
+  delay(200);
+  pushButton(Button::A, 100);
+  delay(200);
+}
+
+// =========================================
 //   メインマクロ
 // =========================================
 void runMacro() {
 
   // ① ゲーム起動 → ゲームモード選択画面まで A連打
+  pushButton(Button::HOME, 500);
   pushButton(Button::A, 250, 32);
 
 // =========================================
@@ -235,9 +252,10 @@ void runMacro() {
 //   setup / loop
 // =========================================
 void setup() {
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
-  pinMode(PIN_LED1, OUTPUT);
-  pinMode(PIN_LED2, OUTPUT);
+  pinMode(PIN_BUTTON,  INPUT_PULLUP);
+  pinMode(PIN_RESTART, INPUT_PULLUP);
+  pinMode(PIN_LED1,    OUTPUT);
+  pinMode(PIN_LED2,    OUTPUT);
 
   // パラメータ自動計算
   calcParams();
@@ -274,18 +292,31 @@ void loop() {
 
   if (state == DONE) {
     // 赤LED点灯・TIMEOUT_MS 秒間 sendReport しながら待機
+    // その間 PIN_RESTART が押されたらゲーム終了→マクロ再実行
     digitalWrite(PIN_LED2, HIGH);
     unsigned long n   = TIMEOUT_MS / 100;
     unsigned long rem = TIMEOUT_MS % 100;
+    bool restarted = false;
     for (unsigned long i = 0; i < n; i++) {
       SwitchControlLibrary().sendReport();
       delay(100);
+      if (digitalRead(PIN_RESTART) == LOW) {
+        delay(50);  // チャタリング防止
+        restarted = true;
+        break;
+      }
     }
-    if (rem > 0) delay(rem);
-
-    // タイムアウト → 赤LED消灯して完全停止
     digitalWrite(PIN_LED2, LOW);
-    state = STOPPED;
+
+    if (restarted) {
+      // ゲーム終了 → マクロ再実行
+      quitGame();
+      state = RUNNING;
+    } else {
+      // タイムアウト → 完全停止
+      if (rem > 0) delay(rem);
+      state = STOPPED;
+    }
   }
 
   if (state == STOPPED) {

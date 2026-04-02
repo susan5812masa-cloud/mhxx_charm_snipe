@@ -72,7 +72,7 @@ SERIAL_BAUD = 9600
 
 # タイムアウト設定（秒）
 TIMEOUT_READY  = 30     # READY受信タイムアウト（Arduino起動後）
-TIMEOUT_DONE   = 900    # DONE受信タイムアウト（マクロ実行中、秒）= 15分
+TIMEOUT_DONE   = 9000   # DONE受信タイムアウト（マクロ実行中、秒）= 150分
 TIMEOUT_ACK    = 30     # ACK受信タイムアウト（ADJUST送信後）
 
 # ループ上限

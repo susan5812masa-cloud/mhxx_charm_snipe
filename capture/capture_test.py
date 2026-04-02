@@ -1,5 +1,14 @@
 import cv2
 import os
+import ctypes
+
+# スリープ・画面OFFを抑制するフラグ
+ES_CONTINUOUS       = 0x80000000
+ES_SYSTEM_REQUIRED  = 0x00000001
+ES_DISPLAY_REQUIRED = 0x00000002
+ctypes.windll.kernel32.SetThreadExecutionState(
+    ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+)
 
 cap = cv2.VideoCapture(0)
 
@@ -34,3 +43,6 @@ else:
 
     cap.release()
     cv2.destroyAllWindows()
+
+# スリープ抑制を解除して元の電源管理設定に戻す
+ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)

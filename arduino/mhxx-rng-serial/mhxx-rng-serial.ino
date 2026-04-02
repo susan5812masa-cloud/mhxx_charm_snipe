@@ -91,6 +91,10 @@ enum State { WAITING, RUNNING, WAIT_ADJUST, DONE, STOPPED };
 State state      = WAITING;
 bool  serialMode = false;  // true=PCからのSTARTで起動 / false=ボタンで起動
 
+// READY 定期送信（Pythonがいつ起動しても受信できるように）
+const unsigned long READY_INTERVAL = 3000UL;  // 3秒おき
+unsigned long       lastReadyMs    = 0;
+
 // =========================================
 //   自動計算関数
 // =========================================
@@ -331,6 +335,12 @@ void loop() {
   if (state == WAITING) {
     SwitchControlLibrary().sendReport();
     delay(100);
+
+    // READY を定期送信（Pythonがいつ起動してもキャッチできるように）
+    if (millis() - lastReadyMs >= READY_INTERVAL) {
+      Serial1.println("READY");
+      lastReadyMs = millis();
+    }
 
     // 物理ボタン（手動モード）
     if (digitalRead(PIN_BUTTON) == LOW) {

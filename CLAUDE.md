@@ -53,6 +53,8 @@ OCR uses dual-mode processing (normal + color-inverted) with a correction dictio
 
 ### Arduino (`arduino/mhxx-rng-long/`)
 
+**ボード: Arduino Leonardo**（UNO ではない。コード記述時に重要）
+
 `mhxx-rng-long.ino` emulates a Switch Pro Controller. Key calibration constants that must be tuned per-environment:
 
 | Constant | Purpose |
@@ -65,6 +67,36 @@ OCR uses dual-mode processing (normal + color-inverted) with a correction dictio
 
 Pin assignments: Button=2, Green LED=3 (running), Red LED=4 (done).
 
+#### Leonardo の Serial に関する注意
+
+Leonardo は UNO と Serial の扱いが異なる。スケッチを書く際に必ず区別すること。
+
+| オブジェクト | 接続先 | 用途 |
+|---|---|---|
+| `Serial` | USB CDC（ネイティブUSB） | PC との直接通信、デバッグ出力 |
+| `Serial1` | D0(RX) / D1(TX) | 外部デバイス（CH340等）との UART 通信 |
+
+本番環境では Arduino USB → Switch 接続のため `Serial`（USB）が HID で占有される。
+外部シリアル通信が必要な場合は `Serial1`（D0/D1）を使うこと。
+
+#### PC-Arduino 間シリアル通信（開発・デバッグ時）
+
+CH340G USB-UART 変換モジュール経由で接続する。
+
+```
+PC (USB) ── CH340G ── Arduino Leonardo
+               TXD → D0 (RX / Serial1)
+               RXD ← D1 (TX / Serial1)
+               GND → GND
+           VCC+5V → 5V  ※Arduino USB を抜いた場合の電源供給
+```
+
+- CH340G の電圧ジャンパは **VCC+5V ↔ CH340G VCC**（5Vモード）に設定すること
+  - 3.3Vモードにすると TXD 出力が 3.3V になり Arduino（5V系）との通信が不安定になる
+- スケッチ書き込み時は CH340G の TX/RX を D0/D1 から**必ず外すこと**
+- Arduino USB と CH340G を同時に D0/D1 に接続するとバス競合が起きる
+  - デバッグ通信中は Arduino USB を抜き、CH340G の VCC+5V から電源供給する
+
 ### Submodule (`capture/mhxx-rng-main/`)
 
 External RNG solver from `apmnnn/mhxx-rng`. Contains the Jupyter notebook (`mhxx-rng.ipynb`) with the core RNG algorithm. `find_frame.py` imports from this submodule to iterate frames.
@@ -74,3 +106,12 @@ External RNG solver from `apmnnn/mhxx-rng`. Contains the Jupyter notebook (`mhxx
 Skill names are stored in two forms in `read_talisman.py`: full Japanese names and abbreviated versions (e.g., `攻撃力UP【大】` → `攻撃大`). The mapping between OCR output and RNG internal skill IDs is defined in `find_frame.py`.
 
 Output is appended to `capture/talisman_log.csv` (gitignored).
+
+## Debug Tools (`debug/`)
+
+PC-Arduino 間のシリアル通信疎通確認用スクリプト。本番環境への組み込み前の動作確認に使用する。
+
+- `debug/serial_debug/serial_debug.ino` — Arduino 側（`Serial1` 使用）
+- `debug/serial_debug.py` — PC 側（pyserial。上部の `COM_PORT` を CH340 のポート番号に書き換えて使用）
+
+動作フロー: PC → `start` 送信 → 緑LED 5回点滅 → Arduino → `done` 送信 → PC → `end` 送信 → 赤LED 5秒点灯 → 待機状態へ
